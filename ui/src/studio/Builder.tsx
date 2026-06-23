@@ -5,7 +5,7 @@
 // (list/collection/tasks/announcements) defines its fields right there — no
 // separate "entities" step. Identity stays editable (✎ button). Export the spec
 // → the codegen (redstars/tools/builder) turns it into a real deployable app.
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { ViewSlotProps } from '@delminator/core-ui'
 import registryData from '../primitive-registry.json'
 
@@ -22,10 +22,12 @@ type Spec = {
 const PRIMS = (registryData as { primitives: Array<Record<string, unknown>> }).primitives
 const DATA_BRICKS = new Set(['object-list', 'collection', 'tasks', 'announcements'])
 const FIELD_TYPES = ['text', 'number', 'date', 'bool', 'enum']
+// Two spaces only: "Gestion" = the collaborator view (what staff AND admins
+// see — they're the same back-office), and "Espace membre" = the user view.
+// The admin-only delta is an advanced concept, not exposed in the no-code UI.
 const VIEWS: Array<{ k: string; fr: string; en: string }> = [
-  { k: 'collaborator', fr: 'Staff', en: 'Staff' },
-  { k: 'admin', fr: 'Admin', en: 'Admin' },
-  { k: 'user', fr: 'Membre', en: 'Member' },
+  { k: 'collaborator', fr: 'Gestion', en: 'Management' },
+  { k: 'user', fr: 'Espace membre', en: 'Member space' },
 ]
 const KIND_ICON: Record<string, string> = {
   'member-list': '👥', catalog: '🛍️', quotes: '📝', invoices: '💰', 'org-members': '🤝',
@@ -68,10 +70,24 @@ function buildSlot(kind: string, entity: Entity | undefined, label: L): Record<s
 export default function Builder({ i18n }: ViewSlotProps) {
   const fr = i18n.language === 'fr'
   const T = (a: string, b: string) => (fr ? a : b)
-  const [spec, setSpec] = useState<Spec>(blank)
-  const [phase, setPhase] = useState<'identity' | 'build'>('identity')
+  // ---- persistence: auto-save the working draft + named projects (localStorage)
+  const LS = 'studio:current', LSP = 'studio:projects', LSN = 'studio:currentName'
+  const readJSON = (k: string) => { try { return JSON.parse(localStorage.getItem(k) || 'null') } catch { return null } }
+  const resumed = useMemo(() => readJSON(LS), [])
+  const [spec, setSpec] = useState<Spec>(() => (resumed && typeof resumed === 'object') ? { ...blank(), ...resumed } : blank())
+  const [phase, setPhase] = useState<'identity' | 'build'>(() => (resumed && slug(resumed.id || '').length >= 3 && resumed.name?.fr) ? 'build' : 'identity')
   const [role, setRole] = useState('collaborator')
+  const [projName, setProjName] = useState<string>(() => { try { return localStorage.getItem(LSN) || '' } catch { return '' } })
+  const [projects, setProjects] = useState<Record<string, Spec>>(() => readJSON(LSP) || {})
   const up = (fn: (s: Spec) => void) => setSpec(s => { const n = structuredClone(s); fn(n); return n })
+
+  useEffect(() => { try { localStorage.setItem(LS, JSON.stringify(spec)) } catch { /* */ } }, [spec])
+  useEffect(() => { try { localStorage.setItem(LSN, projName) } catch { /* */ } }, [projName])
+  const persistProjects = (next: Record<string, Spec>) => { setProjects(next); try { localStorage.setItem(LSP, JSON.stringify(next)) } catch { /* */ } }
+  const saveProject = () => { const name = (projName || spec.name.fr || spec.id || 'Sans titre').trim(); setProjName(name); persistProjects({ ...projects, [name]: structuredClone(spec) }) }
+  const loadProject = (name: string) => { const p = projects[name]; if (!p) return; setSpec({ ...blank(), ...structuredClone(p) }); setProjName(name); setPhase(slug(p.id || '').length >= 3 && p.name?.fr ? 'build' : 'identity'); setRole('collaborator') }
+  const deleteProject = (name: string) => { const next = { ...projects }; delete next[name]; persistProjects(next) }
+  const newProject = () => { setSpec(blank()); setProjName(''); setRole('collaborator'); setPhase('identity') }
 
   const identityValid = slug(spec.id).length >= 3 && !!spec.name.fr
   const cleanSpec = useMemo(() => { const s = structuredClone(spec); s.id = slug(s.id); if (!s.entities.length) delete (s as Record<string, unknown>).entities; return s }, [spec])
@@ -105,12 +121,34 @@ export default function Builder({ i18n }: ViewSlotProps) {
   const needsFields = DATA_BRICKS.has(d.kind) && d.kind !== 'announcements'
   const canCommit = d.kind && (d.fr || d.kind) && (!needsFields || d.fields.some(f => f.name))
 
+  // ---- projects bar (shown in both phases) ----------------------------------
+  const savedNames = Object.keys(projects)
+  const projectsBar = (
+    <div className={`${card} px-3 py-2 flex flex-wrap items-center gap-2`}>
+      <span className="text-xs text-c-text-muted">{T('Projet', 'Project')} :</span>
+      <input className="border border-c-border rounded px-2 py-1 text-sm bg-c-card text-c-text w-44"
+        placeholder={T('Sans titre', 'Untitled')} value={projName} onChange={e => setProjName(e.target.value)} />
+      <button className={btnGhost} onClick={saveProject}>💾 {T('Enregistrer', 'Save')}</button>
+      {savedNames.length > 0 && (
+        <select className="border border-c-border rounded px-2 py-1 text-sm bg-c-card text-c-text" value=""
+          onChange={e => { if (e.target.value) loadProject(e.target.value) }}>
+          <option value="">📂 {T('Charger…', 'Load…')}</option>
+          {savedNames.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      )}
+      <button className={btnGhost} onClick={newProject}>+ {T('Nouveau', 'New')}</button>
+      {projName && projects[projName] && <button className="text-c-error text-xs" title={T('Supprimer ce projet', 'Delete project')} onClick={() => deleteProject(projName)}>🗑</button>}
+      <span className="text-[11px] text-c-success ml-auto">✓ {T('sauvegarde auto', 'auto-saved')}</span>
+    </div>
+  )
+
   // ===========================================================================
   // PHASE 1 — IDENTITY (the only assistant step)
   // ===========================================================================
   if (phase === 'identity') {
     return (
       <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
+        {projectsBar}
         <div>
           <h2 className="text-xl font-semibold text-c-text">{T('Nouvelle application', 'New application')} 🛠️</h2>
           <p className="text-sm text-c-text-muted">{T('Étape 1 — donnez une identité à votre app. Vous ajouterez les écrans (briques) juste après.', 'Step 1 — give your app an identity. You add the screens (bricks) right after.')}</p>
@@ -149,6 +187,7 @@ export default function Builder({ i18n }: ViewSlotProps) {
   const menu = spec.views[role]?.menu || []
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+      {projectsBar}
       {/* header — identity stays editable */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-2xl">{spec.icon}</span>
