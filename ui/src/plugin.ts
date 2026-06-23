@@ -8,7 +8,7 @@ const plugin: AppPlugin = {
   id: 'studio',
   name: {"fr":"Studio","en":"Studio"},
   icon: "🛠️",
-  version: '0.1.3',
+  version: '0.1.4',
   minCoreVersion: '0.6.0',
   accentToken: 'c-accent',
   views: {

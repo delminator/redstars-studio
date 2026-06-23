@@ -67,6 +67,43 @@ function buildSlot(kind: string, entity: Entity | undefined, label: L): Record<s
   }
 }
 
+// Structural preview: a wireframe per primitive kind (no host components, just
+// a recognizable mock so you "see" the app shape before generating).
+const KIND_PREVIEW: Record<string, { label: string; layout: string }> = {
+  'member-list': { label: 'Annuaire des membres', layout: 'list' },
+  catalog: { label: 'Catalogue', layout: 'cards' },
+  quotes: { label: 'Devis', layout: 'table' },
+  invoices: { label: 'Factures', layout: 'table' },
+  'org-members': { label: 'Partenaires', layout: 'list' },
+  'cash-register': { label: 'Caisse', layout: 'blocks' },
+  'object-list': { label: '', layout: 'table' },
+  collection: { label: '', layout: 'table' },
+  dashboard: { label: 'Tableau de bord', layout: 'tiles' },
+  settings: { label: 'Paramètres', layout: 'blocks' },
+  tasks: { label: 'Tâches', layout: 'list' },
+  announcements: { label: 'Annonces', layout: 'feed' },
+}
+function PreviewBody({ slot }: { slot: Record<string, unknown> }) {
+  const meta = KIND_PREVIEW[String(slot.kind)] || { label: String(slot.kind), layout: 'list' }
+  const cols = (slot.columns as Array<{ label: L }> | undefined) || []
+  const sk = (n: number) => Array.from({ length: n })
+  const bar = 'rounded bg-c-border/40'
+  if (meta.layout === 'table') {
+    const heads = cols.length ? cols.map(c => c.label.fr) : ['Nom', 'Statut', 'Date']
+    return (
+      <div className="border border-c-border rounded-lg overflow-hidden">
+        <div className="flex bg-c-bg text-xs text-c-text-muted px-2 py-1.5 gap-3">{heads.map((h, i) => <span key={i} className="flex-1 truncate">{h}</span>)}</div>
+        {sk(3).map((_, r) => <div key={r} className="flex px-2 py-2 gap-3 border-t border-c-border">{heads.map((_, i) => <span key={i} className={`flex-1 h-3 ${bar}`} />)}</div>)}
+      </div>
+    )
+  }
+  if (meta.layout === 'cards') return <div className="grid grid-cols-3 gap-2">{sk(6).map((_, i) => <div key={i} className="border border-c-border rounded-lg p-2"><div className={`h-12 mb-1 ${bar}`} /><div className={`h-2.5 w-3/4 ${bar}`} /></div>)}</div>
+  if (meta.layout === 'tiles') return <div className="grid grid-cols-3 gap-2">{sk(3).map((_, i) => <div key={i} className="border border-c-border rounded-lg p-3"><div className="h-6 w-10 rounded bg-c-accent/30 mb-1" /><div className={`h-2 w-2/3 ${bar}`} /></div>)}</div>
+  if (meta.layout === 'feed') return <div className="space-y-2">{sk(3).map((_, i) => <div key={i} className="border border-c-border rounded-lg p-2"><div className={`h-3 w-1/3 mb-1 ${bar}`} /><div className={`h-2 w-full ${bar}`} /></div>)}</div>
+  if (meta.layout === 'blocks') return <div className="space-y-2">{sk(3).map((_, i) => <div key={i} className="border border-c-border rounded-lg h-10" />)}</div>
+  return <div className="space-y-1.5">{sk(4).map((_, i) => <div key={i} className="flex items-center gap-2 border border-c-border rounded-lg p-2"><div className="w-8 h-8 rounded-full bg-c-border/40" /><div className={`h-2.5 w-1/3 ${bar}`} /></div>)}</div>
+}
+
 export default function Builder({ i18n }: ViewSlotProps) {
   const fr = i18n.language === 'fr'
   const T = (a: string, b: string) => (fr ? a : b)
@@ -103,6 +140,9 @@ export default function Builder({ i18n }: ViewSlotProps) {
 
   // ---- add-brick panel -------------------------------------------------------
   const [adding, setAdding] = useState(false)
+  const [preview, setPreview] = useState(false)
+  const [pSel, setPSel] = useState(0)
+  const move = (i: number, dir: -1 | 1) => up(s => { const m = s.views[role].menu; const j = i + dir; if (j < 0 || j >= m.length) return;[m[i], m[j]] = [m[j], m[i]] })
   const [d, setD] = useState({ kind: '', fr: '', en: '', icon: '', align: false, entity: '', fields: [] as Field[] })
   const startAdd = () => { setD({ kind: '', fr: '', en: '', icon: '', align: false, entity: '', fields: [] }); setAdding(true) }
   const pickKind = (k: string) => setD(x => ({ ...x, kind: k, icon: x.icon || KIND_ICON[k] || '📄', entity: DATA_BRICKS.has(k) && k !== 'announcements' ? (x.entity || '') : x.entity }))
@@ -185,6 +225,35 @@ export default function Builder({ i18n }: ViewSlotProps) {
   // PHASE 2 — BUILDER WORKSPACE (add bricks)
   // ===========================================================================
   const menu = spec.views[role]?.menu || []
+
+  // ---- PREVIEW (structural wireframe) ----
+  if (preview) return (
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+      {projectsBar}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-2xl">{spec.icon}</span>
+        <div className="mr-auto"><div className="font-semibold text-c-text">{spec.name.fr || spec.id}</div><div className="text-xs text-c-text-muted">{T('Aperçu (maquette)', 'Preview (wireframe)')}</div></div>
+        <div className="flex gap-1">{VIEWS.filter(v => spec.views[v.k]).map(v => (
+          <button key={v.k} onClick={() => { setRole(v.k); setPSel(0) }} className={`px-3 py-1.5 rounded-lg text-sm ${role === v.k ? 'bg-c-accent/15 text-c-accent font-medium' : 'text-c-text hover:bg-c-accent/5'}`}>{T(v.fr, v.en)}</button>
+        ))}</div>
+        <button className={btnGhost} onClick={() => setPreview(false)}>← {T('Édition', 'Edit')}</button>
+      </div>
+      <div className="flex gap-3 border border-c-border rounded-xl overflow-hidden bg-c-card" style={{ minHeight: 340 }}>
+        <div className="w-44 shrink-0 bg-c-bg p-2 space-y-1 border-r border-c-border">
+          <div className="text-xs text-c-text-muted px-1 mb-1 truncate">{spec.icon} {spec.name.fr}</div>
+          {menu.map((it, i) => <button key={i} onClick={() => setPSel(i)} className={`w-full text-left px-2 py-1.5 rounded text-sm truncate ${pSel === i ? 'bg-c-accent/15 text-c-accent' : 'text-c-text hover:bg-c-accent/5'}`}>{it.icon} {it.label.fr}</button>)}
+          {!menu.length && <div className="text-xs text-c-text-muted px-1">{T('Aucun écran', 'No screen')}</div>}
+        </div>
+        <div className="flex-1 p-4 overflow-auto">
+          {menu[pSel]
+            ? <><div className="text-sm font-semibold text-c-text mb-3">{menu[pSel].label.fr}</div><PreviewBody slot={menu[pSel].slot} /></>
+            : <div className="text-sm text-c-text-muted">{T('Sélectionnez un écran à gauche.', 'Select a screen on the left.')}</div>}
+        </div>
+      </div>
+      <p className="text-[11px] text-c-text-muted">{T('Maquette structurelle. Le rendu réel utilisera les vrais composants du host.', 'Structural wireframe. Real rendering uses the host components.')}</p>
+    </div>
+  )
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       {projectsBar}
@@ -196,6 +265,7 @@ export default function Builder({ i18n }: ViewSlotProps) {
           <div className="text-xs text-c-text-muted font-mono">{slug(spec.id)}</div>
         </div>
         <button className={btnGhost} onClick={() => setPhase('identity')}>✎ {T('Identité', 'Identity')}</button>
+        <button className={btnGhost} disabled={!menu.length} onClick={() => { setPSel(0); setPreview(true) }}>👁 {T('Aperçu', 'Preview')}</button>
         <button className={btn} disabled={!exportable} onClick={download}>⬇ {T('Exporter la spec', 'Export spec')}</button>
       </div>
 
@@ -221,6 +291,8 @@ export default function Builder({ i18n }: ViewSlotProps) {
               <div className="text-sm text-c-text font-medium">{it.label.fr}</div>
               <div className="text-xs text-c-text-muted"><span className="font-mono">{String(it.slot.kind)}</span>{it.slot.endpoint ? ` · ${String(it.slot.endpoint)}` : ''}{it.align === 'bottom' ? ' · ⤓ bas' : ''}</div>
             </div>
+            <button className="text-c-text-muted text-sm hover:text-c-text disabled:opacity-30 px-1" disabled={i === 0} onClick={() => move(i, -1)} title={T('Monter', 'Up')}>↑</button>
+            <button className="text-c-text-muted text-sm hover:text-c-text disabled:opacity-30 px-1" disabled={i === menu.length - 1} onClick={() => move(i, 1)} title={T('Descendre', 'Down')}>↓</button>
             <button className="text-c-text-muted text-xs hover:text-c-error" onClick={() => up(s => { s.views[role].menu.splice(i, 1) })}>{T('retirer', 'remove')}</button>
           </div>
         ))}

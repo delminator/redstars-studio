@@ -1,6 +1,6 @@
 {
   "name": "@redstars/studio-plugin",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "description": "MyApp plugin bundle \u2014 runs inside the redstars-frontend host via the AppPlugin contract.",
