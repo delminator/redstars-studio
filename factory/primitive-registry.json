@@ -1,0 +1,216 @@
+{
+  "_meta": {
+    "registryVersion": "0.1.0",
+    "purpose": "Machine-readable catalogue of every host primitive the app builder can expose. Drives the builder's auto-generated config forms AND serves as the platform conformance audit ('did we expose every capability generically?'). The builder reads this; it does NOT hand-write per-primitive forms.",
+    "sourceOfTruth": [
+      "redstars/packages/core-ui/src/primitives.ts (config interfaces — newest)",
+      "redstars-frontend/src/lib/plugin-host/slots.tsx (isPrimitive() + renderPrimitive() — what the host ACTUALLY renders)",
+      "redstars-frontend/src/lib/plugin-host/primitives/<Kind>.tsx (runtime behaviour)"
+    ],
+    "drift": "capabilities.json (tools/fleet) lists only 7 of the 13 rendered primitives and is stale (contractVersion 0.3.0 vs core-ui SoT 0.15.0). The published @delminator/core-ui (0.7.0 pinned) lags the SoT, so primitives with inPublishedTypes=false must be wired with an `as unknown as` cast until republished.",
+    "todo": "Auto-derive this file from primitives.ts via the TS compiler API so it never drifts. This hand-authored cut covers the NO-CODE surface (the fields the builder exposes); fields requiring app code are listed under `needsCode`.",
+    "noCodeLegend": {
+      "full": "Every interesting field is plain data → 100% buildable without app code (though may still need backend tables, see needsBackend).",
+      "partial": "Display/config is no-code, but the high-value interactions (row detail, actions, custom blocks) need app code → eject.",
+      "none": "Only meaningful with app-shipped code."
+    },
+    "dataSourceLegend": {
+      "core": "Core-owned per-org data (gateway → core). App provides NOTHING. Instantly usable.",
+      "app-endpoint": "Reads/writes the APP's own API → the builder must let the user declare ENTITIES (tables) and codegen migrations + the generic CRUD pod.",
+      "mixed": "Sources can point at core OR app endpoints.",
+      "none": "Pure layout / no data fetch."
+    }
+  },
+
+  "fieldTypes": {
+    "localized": "{ fr: string, en: string }",
+    "enum": "one of `options`",
+    "boolean": "checkbox",
+    "string": "text",
+    "number": "number",
+    "resource": "name of an app entity/endpoint declared in the spec (drives codegen of a table + CRUD route)",
+    "array": "repeatable group of `of`",
+    "object": "fixed group of `fields`",
+    "needsCode": "EXCLUDED from the no-code builder — a function / React component / modal id. Listed so the builder can grey it out + offer 'eject to code'."
+  },
+
+  "primitives": [
+    {
+      "kind": "catalog",
+      "title": { "fr": "Catalogue", "en": "Catalog" },
+      "purpose": "Shared product/service catalogue (prices, VAT). Core-owned per-org store.",
+      "dataSource": "core", "needsBackend": false, "noCode": "full",
+      "inPublishedTypes": true, "hostImpl": "primitives/Catalog.tsx",
+      "config": {
+        "layout": { "type": "enum", "options": ["list", "cards", "both"], "default": "list" },
+        "fields": { "type": "array", "of": "{ field: reference, label?: localized }", "note": "field ∈ reference|label|kind|category|unit|purchase_price|sale_price|vat_rate|supplier|is_active" },
+        "card": { "type": "object", "fields": { "title": "enum", "subtitle": "enum", "badge": "enum", "image": "enum" } },
+        "editable": { "type": "boolean", "default": true },
+        "searchable": { "type": "boolean", "default": true },
+        "filterKind": { "type": "enum", "options": ["fourniture", "prestation"], "optional": true }
+      },
+      "needsCode": []
+    },
+    {
+      "kind": "quotes",
+      "title": { "fr": "Devis", "en": "Quotes" },
+      "purpose": "Quotes workspace over the shared catalogue (HT/VAT/TTC, statuses). Core-owned.",
+      "dataSource": "core", "needsBackend": false, "noCode": "full",
+      "inPublishedTypes": true, "hostImpl": "primitives/Quotes.tsx",
+      "config": { "editable": { "type": "boolean", "default": true } }, "needsCode": []
+    },
+    {
+      "kind": "invoices",
+      "title": { "fr": "Factures", "en": "Invoices" },
+      "purpose": "Invoices workspace (create/convert quote, Swiss QR-bill PDF). Core-owned.",
+      "dataSource": "core", "needsBackend": false, "noCode": "full",
+      "inPublishedTypes": true, "hostImpl": "primitives/Invoices.tsx",
+      "config": { "editable": { "type": "boolean", "default": true } }, "needsCode": []
+    },
+    {
+      "kind": "org-members",
+      "title": { "fr": "Relations inter-organisations", "en": "Org relations" },
+      "purpose": "Invite/accept partner orgs (client/supplier/partner/member). Core-owned.",
+      "dataSource": "core", "needsBackend": false, "noCode": "full",
+      "inPublishedTypes": true, "hostImpl": "primitives/OrgMembers.tsx",
+      "config": { "editable": { "type": "boolean", "default": true } }, "needsCode": []
+    },
+    {
+      "kind": "cash-register",
+      "title": { "fr": "Caisse", "en": "Cash register" },
+      "purpose": "Cash register (entries, income/expense stats, multi-register). Core-owned.",
+      "dataSource": "core", "needsBackend": false, "noCode": "full",
+      "inPublishedTypes": true, "hostImpl": "primitives/CashRegister.tsx",
+      "config": {
+        "multiRegister": { "type": "boolean", "default": true },
+        "quickActions": { "type": "array", "of": "{ label: localized, amount?: number, category?: string, paymentMethod?: enum(cash|check), transactionType?: enum(income|expense) }" },
+        "categories": { "type": "object", "fields": { "income": "array<string>", "expense": "array<string>" } },
+        "paymentMethods": { "type": "array", "of": "enum(cash|check)" },
+        "editable": { "type": "boolean", "default": true }
+      },
+      "needsCode": []
+    },
+    {
+      "kind": "member-list",
+      "title": { "fr": "Membres", "en": "Members" },
+      "purpose": "Org member directory via the canonical UserCard (+ offline members, relations, scan).",
+      "dataSource": "core", "needsBackend": false, "noCode": "partial",
+      "inPublishedTypes": true, "hostImpl": "primitives/MemberList.tsx",
+      "config": {
+        "offlineMembers": { "type": "boolean", "default": false },
+        "relations": { "type": "boolean", "default": false },
+        "detailLayout": { "type": "enum", "options": ["modal", "panel"], "default": "modal" },
+        "scanToFind": { "type": "boolean", "default": false },
+        "display": { "type": "object", "fields": { "username": "boolean", "fullName": "boolean", "avatar": "boolean", "role": "boolean", "activeBadge": "boolean" } },
+        "empty": { "type": "localized", "optional": true }
+      },
+      "needsCode": ["overlay (fn)", "onRowClick (fn)", "rowOpensModal (app modal)", "editable.onChange (fn)"]
+    },
+    {
+      "kind": "object-list",
+      "title": { "fr": "Liste d'objets", "en": "Object list" },
+      "purpose": "Generic table over an APP entity + inline create form + row→detail modal.",
+      "dataSource": "app-endpoint", "needsBackend": true, "noCode": "partial",
+      "inPublishedTypes": true, "hostImpl": "primitives/ObjectList.tsx",
+      "config": {
+        "endpoint": { "type": "resource", "required": true },
+        "title": { "type": "localized", "optional": true },
+        "intro": { "type": "localized", "optional": true },
+        "columns": { "type": "array", "required": true, "of": "{ key: string, label: localized, format?: enum(text|number|date), unitKey?: string }" },
+        "createFields": { "type": "array", "of": "objectListField", "note": "{ key, label, type: text|number|date|enum|select, required?, step?, options?[enum], source?{endpoint,valueKey,labelKey}[select] }" },
+        "empty": { "type": "localized", "optional": true }
+      },
+      "needsCode": ["rowOpensModal (app modal = the row detail/actions sheet)"]
+    },
+    {
+      "kind": "collection",
+      "title": { "fr": "Collection", "en": "Collection" },
+      "purpose": "Display-rich object-list superset: list⇄cards, search, filter chips, sort, selection, per-row actions.",
+      "dataSource": "app-endpoint", "needsBackend": true, "noCode": "partial",
+      "inPublishedTypes": false, "hostImpl": "primitives/Collection.tsx",
+      "config": {
+        "endpoint": { "type": "resource", "required": true },
+        "title": { "type": "localized", "optional": true },
+        "intro": { "type": "localized", "optional": true },
+        "layout": { "type": "enum", "options": ["list", "cards", "both"], "default": "list" },
+        "columns": { "type": "array", "required": true, "of": "objectListColumn" },
+        "card": { "type": "object", "fields": { "title": "string", "subtitle": "string", "badge": "string", "thumb": "string" } },
+        "filters": { "type": "array", "of": "{ key: string, label?: localized, options:[{value,label?,tone?}], multi?: boolean }" },
+        "search": { "type": "boolean", "default": true },
+        "searchKeys": { "type": "array", "of": "string" },
+        "sort": { "type": "array", "of": "string" },
+        "selection": { "type": "boolean", "default": false },
+        "createFields": { "type": "array", "of": "objectListField" },
+        "empty": { "type": "localized", "optional": true }
+      },
+      "needsCode": ["rowOpensModal", "rowActions (staff/member modals)", "createOpensModal", "badgeOpensModal"]
+    },
+    {
+      "kind": "dashboard",
+      "title": { "fr": "Tableau de bord", "en": "Dashboard" },
+      "purpose": "Uniform KPI grid + list blocks. KPIs/lists fetched from core or app endpoints.",
+      "dataSource": "mixed", "needsBackend": "ifAppSources", "noCode": "partial",
+      "inPublishedTypes": false, "hostImpl": "primitives/Dashboard.tsx",
+      "config": {
+        "title": { "type": "localized", "optional": true },
+        "kpis": { "type": "array", "of": "{ label: localized, icon?: string, source?: resource, query?: object, agg?: enum(count|sum), field?: string, core?: enum(members), sub?: localized, tone?: enum(accent|success|warning|error|info) }" },
+        "blocks": { "type": "array", "of": "listBlock", "note": "{ kind:'list', title, source: resource, query?, primary, secondary?, empty?, max?, span? }" }
+      },
+      "needsCode": ["blocks of kind:'custom' (app React block component)"]
+    },
+    {
+      "kind": "settings",
+      "title": { "fr": "Paramètres", "en": "Settings" },
+      "purpose": "Config-driven settings page: pre-built CORE blocks (no code) + custom app blocks.",
+      "dataSource": "core", "needsBackend": false, "noCode": "partial",
+      "inPublishedTypes": false, "hostImpl": "primitives/Settings.tsx",
+      "config": {
+        "title": { "type": "localized", "optional": true },
+        "blocks": { "type": "array", "required": true, "of": "coreBlock", "note": "no-code core blocks: { kind: profile|wallet|scanner, title?, icon? }" }
+      },
+      "coreBlocks": ["profile", "wallet", "scanner"],
+      "needsCode": ["blocks of kind:'custom' (app settings block component)"]
+    },
+    {
+      "kind": "tasks",
+      "title": { "fr": "Tâches", "en": "Tasks" },
+      "purpose": "Task board aggregating sources. Query sources (no-code) map an app endpoint's rows to task lines.",
+      "dataSource": "app-endpoint", "needsBackend": true, "noCode": "partial",
+      "inPublishedTypes": false, "hostImpl": "primitives/Tasks.tsx",
+      "config": {
+        "title": { "type": "localized", "optional": true },
+        "sources": { "type": "array", "required": true, "of": "querySource", "note": "{ kind:'query', id, label, endpoint: resource, query?, item:{ title, sub?, tag: localized, tone?, toneBy?{key,map} }, rowOpensModal?, empty? }" }
+      },
+      "needsCode": ["sources of kind:'custom' (app component)", "querySource.rowOpensModal (app modal)"]
+    },
+    {
+      "kind": "announcements",
+      "title": { "fr": "Annonces", "en": "Announcements" },
+      "purpose": "Community page: announcements + optional events + month calendar. Generic CRUD over the app's endpoints.",
+      "dataSource": "app-endpoint", "needsBackend": true, "noCode": "full",
+      "inPublishedTypes": false, "hostImpl": "primitives/Announcements.tsx",
+      "config": {
+        "title": { "type": "localized", "optional": true },
+        "stats": { "type": "boolean", "default": true },
+        "wide": { "type": "boolean", "default": false },
+        "announcements": { "type": "object", "fields": { "endpoint": "resource", "label": "localized", "comments": "boolean", "image": "boolean" } },
+        "events": { "type": "object", "optional": true, "fields": { "endpoint": "resource", "label": "localized", "calendar": "boolean", "types": "array<{value,label}>" } }
+      },
+      "needsCode": []
+    },
+    {
+      "kind": "sections",
+      "title": { "fr": "Sections", "en": "Sections" },
+      "purpose": "Meta-slot: vertically stack several primitive slots under one menu entry.",
+      "dataSource": "none", "needsBackend": false, "noCode": "inherits",
+      "inPublishedTypes": true, "hostImpl": "slots.tsx (isSectionSlot)",
+      "config": { "sections": { "type": "array", "required": true, "of": "slot (any primitive)" } },
+      "needsCode": []
+    }
+  ],
+
+  "alsoCode": {
+    "comment": "AppPlugin features that are inherently code (the eject boundary, NOT exposed by the no-code builder):",
+    "items": ["modals (app React components)", "memberDetailTabs (app tab components)", "memberRow (fn)", "custom lazy() slot components", "any custom business logic / extra pod routes / egress"]
+  }
+}

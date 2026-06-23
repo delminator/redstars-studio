@@ -367,13 +367,28 @@ export default function Builder({ i18n }: ViewSlotProps) {
           </div>
         )}
 
-      {/* export hint */}
-      {!exportable && totalBricks === 0 && <p className="text-xs text-c-text-muted">{T('Ajoutez au moins une brique pour pouvoir exporter.', 'Add at least one brick to export.')}</p>}
-      <details className={`${card} p-3`}>
-        <summary className="text-sm text-c-text cursor-pointer">{T('Voir / exporter la spec (JSON)', 'View / export the spec (JSON)')}</summary>
-        <div className="text-xs text-c-text-muted my-2">{T('Puis générez le repo :', 'Then generate the repo:')} <code className="text-c-text">node redstars/tools/builder/generate.mjs {slug(spec.id) || 'app'}.spec.json</code></div>
-        <pre className="text-xs text-c-text overflow-x-auto max-h-96">{specJson}</pre>
-      </details>
+      {/* publish */}
+      <div className={`${card} p-4 space-y-2`}>
+        <div className="font-medium text-c-text">🚀 {T('Publier', 'Publish')}</div>
+        {!exportable
+          ? <p className="text-xs text-c-text-muted">{T('Ajoutez au moins une brique pour publier.', 'Add at least one brick to publish.')}</p>
+          : (
+            <>
+              <ul className="text-sm text-c-text-muted space-y-0.5">
+                <li>{T('Repo', 'Repo')} : <span className="font-mono text-c-text">delminator/redstars-{slug(spec.id)}</span> ({T('public', 'public')})</li>
+                <li>{totalBricks} {T('écrans', 'screens')} · {(spec.entities || []).length} {T('jeux de données', 'data sets')}</li>
+              </ul>
+              <button className={btn} onClick={download}>⬇ {T('Télécharger la spec', 'Download spec')}</button>
+              <div className="text-xs text-c-text-muted pt-1">{T('Publication (crée le repo public + déploie) via la « App Factory » :', 'Publish (creates the public repo + deploys) via the “App Factory”:')}</div>
+              <code className="block text-xs text-c-text bg-c-bg rounded p-2 overflow-x-auto">gh workflow run "App Factory" -R delminator/redstars-studio -f spec="$(cat {slug(spec.id) || 'app'}.spec.json)"</code>
+              <p className="text-[11px] text-c-text-muted">{T('À venir : bouton 1-clic + financement participatif + abonnement (nécessite un fournisseur de paiement + gouvernance).', 'Coming: 1-click button + crowdfunding + subscription (needs a payment provider + governance).')}</p>
+            </>
+          )}
+        <details className="pt-1">
+          <summary className="text-xs text-c-text-muted cursor-pointer">{T('Voir la spec (JSON)', 'View spec (JSON)')}</summary>
+          <pre className="text-xs text-c-text overflow-x-auto max-h-96 mt-1">{specJson}</pre>
+        </details>
+      </div>
     </div>
   )
 }
