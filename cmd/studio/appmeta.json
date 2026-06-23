@@ -1,0 +1,8 @@
+{
+  "id": "studio",
+  "name": "Studio",
+  "icon": "🛠️",
+  "color": "#6366f1",
+  "description": "Créez votre application RedStars, sans code — choisissez vos écrans, vos données, et générez l'app.",
+  "visibility": "public"
+}

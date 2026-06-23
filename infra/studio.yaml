@@ -1,0 +1,124 @@
+# Kubernetes manifest for the studio pod (namespace redstars-dev).
+#
+# Deploy: this file is fetched by .github/workflows/deploy-dev.yml.
+# Host it in the core repo at infra/k8s/services/studio.yaml (or adjust
+# the workflow's curl URL).
+#
+# Includes pod identity (L2): the ServiceAccount + projected token let
+# core verify which app is calling its /internal/* API — see
+# docs/NETWORK_ISOLATION.md.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: studio
+  namespace: redstars-dev
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studio-config
+  namespace: redstars-dev
+data:
+  PORT: "3020"
+  GIN_MODE: "release"
+  CORE_SERVICE_URL: "http://core:3000"
+---
+# Secret "studio-secret" (INTERNAL_API_KEY, …) — create out-of-band or
+# sync it from the deploy workflow.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studio
+  namespace: redstars-dev
+  labels:
+    app: studio
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: studio
+  template:
+    metadata:
+      labels:
+        app: studio
+        tier: backend
+    spec:
+      serviceAccountName: studio
+      imagePullSecrets:
+        - name: ghcr-secret
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        # Projected ServiceAccount token, audience-scoped to core —
+        # core verifies it (TokenReview) to identify this pod's app.
+        - name: pod-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: redstars-core
+                  expirationSeconds: 3600
+      containers:
+        - name: studio
+          image: ghcr.io/delminator/redstars-studio/studio:latest
+          # Always: the :latest tag is mutable — IfNotPresent would
+          # serve a stale cached image (e.g. one missing the X-Pod-Token
+          # SDK, which fails pod-identity enforce).
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 3020
+          volumeMounts:
+            - name: pod-token
+              mountPath: /var/run/secrets/redstars
+              readOnly: true
+          envFrom:
+            - configMapRef:
+                name: studio-config
+            - secretRef:
+                name: studio-secret
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3020
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3020
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: studio
+  namespace: redstars-dev
+  labels:
+    app: studio
+    tier: backend
+    # Discovery label — the core's PULL loop lists Services with this
+    # label and fetches /api/v1/<id>/ui/meta from each to build the shop.
+    redstars.io/kind: app
+spec:
+  selector:
+    app: studio
+  ports:
+    - port: 3020
+      targetPort: 3020

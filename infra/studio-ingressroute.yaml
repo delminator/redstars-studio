@@ -1,0 +1,25 @@
+# Per-app IngressRoute (priority 200 — routed BEFORE the catch-all
+# /api/v1 → gateway forwarder). Lets the browser fetch
+# /api/v1/<id>/ui/{manifest.json,plugin.js,meta} straight from your pod,
+# with compression for the bundle. Replace `studio`/port with your app's.
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: studio-api-routes
+  namespace: redstars-dev
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`api.dev.redstars.redlinks.fr`) && PathPrefix(`/api/v1/studio`)
+      priority: 200
+      middlewares:
+        - name: cors-headers
+        - name: compress
+      services:
+        - name: studio
+          port: 3020
+  tls:
+    certResolver: letsencrypt

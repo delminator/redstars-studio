@@ -1,0 +1,16 @@
+# Build output
+ui/dist/
+ui/node_modules/
+node_modules/
+bin/
+
+# Go
+*.test
+
+# Plugin signing private key — NEVER commit (CI secret PLUGIN_SIGNING_KEY)
+*.pem
+.plugin-signing-key*
+
+# Local env
+.env
+.env.local

@@ -1,0 +1,54 @@
+# Cilium NetworkPolicy for the studio pod (L1 isolation).
+#
+# deny-all by default, then: ingress only on the app's own port,
+# egress only to DNS + core + gateway — zero direct DB/Redis access.
+# Host this in the core repo at infra/k8s/network-policies/studio.yaml.
+# See docs/NETWORK_ISOLATION.md.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: studio-deny-all
+  namespace: redstars-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: studio
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: studio-allow-ingress
+  namespace: redstars-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: studio
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - port: 3020
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: studio-allow-egress
+  namespace: redstars-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: studio
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: {} }]      # DNS
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to: [{ podSelector: { matchLabels: { app: core } } }]
+      ports: [{ port: 3000, protocol: TCP }]
+    - to: [{ podSelector: { matchLabels: { app: gateway } } }]
+      ports: [{ port: 3000, protocol: TCP }]

@@ -1,0 +1,52 @@
+# Reusable conformance check — detects template/contract drift.
+#
+# NOTE: this template repo is PRIVATE, so the cross-repo `uses:` form below
+# only works if you enable Settings → Actions → General → Access →
+# "Accessible from repositories owned by …" on THIS repo. If you'd rather not,
+# use the SELF-CONTAINED caller (checks the template out with CORE_REPO_TOKEN) —
+# see redstars-ludo/.github/workflows/conformance.yml for the working example.
+#
+# Cross-repo (needs the Access setting):
+#   name: Conformance
+#   on: [push, pull_request, workflow_dispatch]
+#   jobs:
+#     check:
+#       uses: delminator/redstars-app-template/.github/workflows/conformance.yml@main
+#
+# It checks the calling app against the template + the current contract
+# and reports drift. ⚠ (behind) passes; ✗ (broken) fails the job.
+name: Conformance (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the app
+        uses: actions/checkout@v4
+        with:
+          path: app
+
+      - name: Checkout the template
+        uses: actions/checkout@v4
+        with:
+          repository: delminator/redstars-app-template
+          path: template
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      # Install ui/ deps so the script's tsc contract check can run.
+      # Non-fatal — the script degrades to ⚠ if deps can't resolve.
+      - name: Install ui deps
+        working-directory: app/ui
+        run: pnpm install --frozen-lockfile || pnpm install || true
+
+      - name: Run conformance check
+        run: node template/scripts/conformance.mjs app

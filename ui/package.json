@@ -1,0 +1,25 @@
+{
+  "name": "@redstars/studio-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MyApp plugin bundle \u2014 runs inside the redstars-frontend host via the AppPlugin contract.",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@delminator/core-ui": "^0.6.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^6.0.0",
+    "vite": "^6.3.5"
+  }
+}

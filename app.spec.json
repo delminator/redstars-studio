@@ -1,0 +1,37 @@
+{
+  "id": "studio",
+  "name": {
+    "fr": "Studio",
+    "en": "Studio"
+  },
+  "icon": "🛠️",
+  "color": "#6366f1",
+  "description": "Créez votre application RedStars, sans code — choisissez vos écrans, vos données, et générez l'app.",
+  "accentToken": "c-accent",
+  "port": 3020,
+  "version": "0.1.0",
+  "minCoreVersion": "0.6.0",
+  "visibility": "public",
+  "views": {
+    "collaborator": {
+      "menu": [
+        {
+          "id": "builder",
+          "label": {
+            "fr": "Créateur",
+            "en": "Builder"
+          },
+          "icon": "🛠️",
+          "slot": {
+            "kind": "settings",
+            "blocks": [
+              {
+                "kind": "profile"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

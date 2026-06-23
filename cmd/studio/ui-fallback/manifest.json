@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "bundle_url": "https://api.dev.redstars.redlinks.fr/api/v1/studio/ui/plugin.js",
+  "signature_url": "https://api.dev.redstars.redlinks.fr/api/v1/studio/ui/plugin.js.minisig",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "min_core_version": "0.6.0",
+  "roles": [
+    "collaborator",
+    "admin",
+    "user"
+  ]
+}

@@ -1,0 +1,98 @@
+# Build + sign the UI plugin bundle on push to main (paths: ui/**).
+#
+# Output: dist/plugin.js + dist/plugin.js.minisig + dist/manifest.json,
+# published as a GitHub Release. The pod's pluginhost fetches the latest
+# release and verifies the Ed25519 signature before serving it.
+#
+# REQUIRED SECRET: PLUGIN_SIGNING_KEY  (PKCS8 PEM — generate with
+#   `node scripts/plugin-sign.mjs keygen`; paste the public key into
+#   cmd/studio/main.go `pluginPubkey`).
+# OPTIONAL: REDSTARS_UI_WEBHOOK_SECRET + var PLUGINHOST_WEBHOOK_URL.
+name: Build Plugin (ui)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ui/**'
+      - '.github/workflows/build-plugin.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read plugin version
+        id: ver
+        run: |
+          v=$(node -p "require('./ui/package.json').version")
+          echo "version=$v" >> $GITHUB_OUTPUT
+          echo "tag=plugin-v$v-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Build plugin bundle
+        working-directory: ui
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+
+      - name: Compute manifest
+        id: hash
+        working-directory: ui
+        run: |
+          # Field names + absolute release-asset URLs MUST match what
+          # pkg/pluginhost/host.go parses (version, bundle_url,
+          # signature_url, sha256).
+          sha=$(sha256sum dist/plugin.js | cut -d' ' -f1)
+          base="https://github.com/${{ github.repository }}/releases/latest/download"
+          cat > dist/manifest.json <<JSON
+          {
+            "version": "${{ steps.ver.outputs.version }}",
+            "bundle_url": "$base/plugin.js",
+            "signature_url": "$base/plugin.js.minisig",
+            "sha256": "$sha"
+          }
+          JSON
+          echo "sha=$sha" >> $GITHUB_OUTPUT
+
+      - name: Sign bundle (Ed25519)
+        working-directory: ui
+        env:
+          PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+        run: |
+          node ../scripts/plugin-sign.mjs sign dist/plugin.js \
+            --comment "studio plugin v${{ steps.ver.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: MyApp Plugin v${{ steps.ver.outputs.version }}
+          files: |
+            ui/dist/plugin.js
+            ui/dist/plugin.js.minisig
+            ui/dist/manifest.json
+
+      # Push-notify the gateway so the pluginhost refreshes immediately.
+      # Body + header match core's HMACMiddleware (pkg/pluginhost/webhook.go).
+      - name: Notify pluginhost (webhook)
+        if: vars.PLUGINHOST_WEBHOOK_URL != ''
+        run: |
+          body='{"app_id":"studio","version":"${{ steps.ver.outputs.version }}"}'
+          sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "${{ secrets.REDSTARS_UI_WEBHOOK_SECRET }}" -hex | awk '{print $NF}')
+          curl -fsS -X POST "${{ vars.PLUGINHOST_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Redstars-HMAC-SHA256: $sig" \
+            --data "$body" || echo "(webhook non-blocking)"
