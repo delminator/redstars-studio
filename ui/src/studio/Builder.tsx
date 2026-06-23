@@ -73,6 +73,14 @@ export default function Builder({ i18n }: ViewSlotProps) {
   const specJson = useMemo(() => JSON.stringify(cleanSpec, null, 2), [cleanSpec])
   const valid = slug(spec.id).length >= 3 && spec.name.fr && (spec.views.collaborator?.menu.length ?? 0) > 0
 
+  // Wizard navigation. STEPS is the linear flow; 'bricks' is a reference tab,
+  // reachable anytime from the tab bar but not part of Next/Back. Every step
+  // stays editable — the tabs never lock.
+  const STEPS = ['id', 'data', 'screens', 'gen'] as const
+  const stepIdx = (STEPS as readonly string[]).indexOf(tab)
+  const identityValid = slug(spec.id).length >= 3 && !!spec.name.fr
+  const goto = (k: typeof tab) => { setTab(k); try { window.scrollTo(0, 0) } catch { /* */ } }
+
   const download = () => {
     const blob = new Blob([specJson], { type: 'application/json' })
     const a = document.createElement('a')
@@ -138,6 +146,8 @@ export default function Builder({ i18n }: ViewSlotProps) {
           </div>
           <label className="text-sm text-c-text block">{T('Description', 'Description')}
             <textarea className={inp} rows={2} value={spec.description} onChange={e => up(s => { s.description = e.target.value })} /></label>
+          {!identityValid && <p className="text-xs text-c-warning">{T('Renseignez un identifiant (≥3 lettres) et un nom FR pour valider cette étape.', 'Set an id (≥3 letters) and a FR name to confirm this step.')}</p>}
+          <p className="text-xs text-c-text-muted">{T('Ces informations restent modifiables à tout moment (revenez via les onglets).', 'These details stay editable at any time (come back via the tabs).')}</p>
         </div>
       )}
 
@@ -256,6 +266,19 @@ export default function Builder({ i18n }: ViewSlotProps) {
             <summary className="text-sm text-c-text cursor-pointer">{T('Voir la spec (JSON)', 'View spec (JSON)')}</summary>
             <pre className="text-xs text-c-text overflow-x-auto mt-2 max-h-96">{specJson}</pre>
           </details>
+        </div>
+      )}
+
+      {/* Wizard footer — Back / Next, always re-editable via the tabs above */}
+      {tab !== 'bricks' && (
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-c-border">
+          <button disabled={stepIdx <= 0} onClick={() => goto(STEPS[stepIdx - 1])}
+            className="rounded-lg border border-c-border px-3 py-2 text-xs text-c-text-muted disabled:opacity-40 hover:bg-c-accent/5">← {T('Précédent', 'Back')}</button>
+          <span className="text-xs text-c-text-muted text-center">{T('Étape', 'Step')} {stepIdx + 1}/{STEPS.length} · {T('modifiable à tout moment', 'editable anytime')}</span>
+          {stepIdx < STEPS.length - 1
+            ? <button disabled={tab === 'id' && !identityValid} onClick={() => goto(STEPS[stepIdx + 1])} className={btn}>
+                {tab === 'id' ? T('Valider l’identité', 'Confirm identity') : T('Suivant', 'Next')} →</button>
+            : <span className="w-20" />}
         </div>
       )}
     </div>
