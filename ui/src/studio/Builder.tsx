@@ -7,6 +7,9 @@
 // → the codegen (redstars/tools/builder) turns it into a real deployable app.
 import { useState, useMemo, useEffect } from 'react'
 import type { ViewSlotProps } from '@delminator/core-ui'
+// Real live preview, provided by the host (renders the actual primitives).
+// May be undefined on an older host → we fall back to the structural wireframe.
+import { AppPreview as HostAppPreview } from '@delminator/core-ui/host'
 import registryData from '../primitive-registry.json'
 
 type L = { fr: string; en: string }
@@ -104,7 +107,7 @@ function PreviewBody({ slot }: { slot: Record<string, unknown> }) {
   return <div className="space-y-1.5">{sk(4).map((_, i) => <div key={i} className="flex items-center gap-2 border border-c-border rounded-lg p-2"><div className="w-8 h-8 rounded-full bg-c-border/40" /><div className={`h-2.5 w-1/3 ${bar}`} /></div>)}</div>
 }
 
-export default function Builder({ i18n }: ViewSlotProps) {
+export default function Builder({ i18n, orgOid }: ViewSlotProps) {
   const fr = i18n.language === 'fr'
   const T = (a: string, b: string) => (fr ? a : b)
   // ---- persistence: auto-save the working draft + named projects (localStorage)
@@ -238,19 +241,25 @@ export default function Builder({ i18n }: ViewSlotProps) {
         ))}</div>
         <button className={btnGhost} onClick={() => setPreview(false)}>← {T('Édition', 'Edit')}</button>
       </div>
-      <div className="flex gap-3 border border-c-border rounded-xl overflow-hidden bg-c-card" style={{ minHeight: 340 }}>
-        <div className="w-44 shrink-0 bg-c-bg p-2 space-y-1 border-r border-c-border">
-          <div className="text-xs text-c-text-muted px-1 mb-1 truncate">{spec.icon} {spec.name.fr}</div>
-          {menu.map((it, i) => <button key={i} onClick={() => setPSel(i)} className={`w-full text-left px-2 py-1.5 rounded text-sm truncate ${pSel === i ? 'bg-c-accent/15 text-c-accent' : 'text-c-text hover:bg-c-accent/5'}`}>{it.icon} {it.label.fr}</button>)}
-          {!menu.length && <div className="text-xs text-c-text-muted px-1">{T('Aucun écran', 'No screen')}</div>}
-        </div>
-        <div className="flex-1 p-4 overflow-auto">
-          {menu[pSel]
-            ? <><div className="text-sm font-semibold text-c-text mb-3">{menu[pSel].label.fr}</div><PreviewBody slot={menu[pSel].slot} /></>
-            : <div className="text-sm text-c-text-muted">{T('Sélectionnez un écran à gauche.', 'Select a screen on the left.')}</div>}
-        </div>
-      </div>
-      <p className="text-[11px] text-c-text-muted">{T('Maquette structurelle. Le rendu réel utilisera les vrais composants du host.', 'Structural wireframe. Real rendering uses the host components.')}</p>
+      {HostAppPreview
+        ? <HostAppPreview spec={spec} role={role as 'collaborator' | 'user'} orgOid={orgOid} language={i18n.language} />
+        : (
+          <div className="flex gap-3 border border-c-border rounded-xl overflow-hidden bg-c-card" style={{ minHeight: 340 }}>
+            <div className="w-44 shrink-0 bg-c-bg p-2 space-y-1 border-r border-c-border">
+              <div className="text-xs text-c-text-muted px-1 mb-1 truncate">{spec.icon} {spec.name.fr}</div>
+              {menu.map((it, i) => <button key={i} onClick={() => setPSel(i)} className={`w-full text-left px-2 py-1.5 rounded text-sm truncate ${pSel === i ? 'bg-c-accent/15 text-c-accent' : 'text-c-text hover:bg-c-accent/5'}`}>{it.icon} {it.label.fr}</button>)}
+              {!menu.length && <div className="text-xs text-c-text-muted px-1">{T('Aucun écran', 'No screen')}</div>}
+            </div>
+            <div className="flex-1 p-4 overflow-auto">
+              {menu[pSel]
+                ? <><div className="text-sm font-semibold text-c-text mb-3">{menu[pSel].label.fr}</div><PreviewBody slot={menu[pSel].slot} /></>
+                : <div className="text-sm text-c-text-muted">{T('Sélectionnez un écran à gauche.', 'Select a screen on the left.')}</div>}
+            </div>
+          </div>
+        )}
+      <p className="text-[11px] text-c-text-muted">{HostAppPreview
+        ? T('Aperçu réel — vrais composants du host ; les données de votre app (pas encore déployée) sont vides, les membres/catalogue montrent les données de votre org.', 'Real preview — host components; your app data (not deployed yet) is empty, members/catalog show your org data.')
+        : T('Maquette structurelle (host trop ancien pour l’aperçu réel).', 'Structural wireframe (host too old for real preview).')}</p>
     </div>
   )
 
