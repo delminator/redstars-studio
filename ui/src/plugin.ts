@@ -8,7 +8,9 @@ const plugin: AppPlugin = {
   id: 'studio',
   name: {"fr":"Studio","en":"Studio"},
   icon: "🛠️",
-  version: '0.1.6',
+  // Console/Minitel: an ASCII icon — the web emoji folds to a blank in Videotex G0.
+  console: { icon: '[o]' },
+  version: '0.1.7',
   minCoreVersion: '0.6.0',
   accentToken: 'c-accent',
   views: {
