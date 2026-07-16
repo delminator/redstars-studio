@@ -34,7 +34,17 @@ jobs:
           set -e
           dest=/tmp/ctx/studio/cmd/studio/ui-fallback
           short="${GITHUB_SHA::7}"
-          bp=$(gh run list --workflow='Build Plugin (ui)' --commit=${{ github.sha }} --json databaseId --jq 'length' 2>/dev/null || echo 0)
+          # Poll for the parallel build-plugin RUN to register (~30s) before deciding
+          # whether to wait for its release. A single check often runs before that run
+          # appears, reads 0, skips the wait, and embeds the PREVIOUS bundle (e.g. a
+          # stale console iconGrid) though the deploy goes green. build-plugin only
+          # triggers on ui/**, so "run appeared" == "a release is coming".
+          bp=0
+          for i in $(seq 1 6); do
+            bp=$(gh run list --workflow='Build Plugin (ui)' --commit=${{ github.sha }} --json databaseId --jq 'length' 2>/dev/null || echo 0)
+            [ "$bp" != "0" ] && [ "$bp" != "" ] && break
+            echo "waiting for build-plugin run to register ($i/6)…"; sleep 5
+          done
           tag=""
           if [ "$bp" != "0" ] && [ "$bp" != "" ]; then
             for i in $(seq 1 30); do
