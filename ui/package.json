@@ -1,6 +1,6 @@
 {
   "name": "@redstars/studio-plugin",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "type": "module",
   "description": "MyApp plugin bundle \u2014 runs inside the redstars-frontend host via the AppPlugin contract.",
@@ -9,7 +9,7 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@delminator/core-ui": "^0.16.0"
+    "@delminator/core-ui": "^0.17.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
