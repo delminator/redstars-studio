@@ -11,9 +11,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/delminator/redstars/backend/pkg/pluginhost"
+	"github.com/delminator/redstars/backend/pkg/appstore"
 	"github.com/delminator/redstars/backend/pkg/coresdk"
+	"github.com/delminator/redstars/backend/pkg/pluginhost"
 	"github.com/gin-gonic/gin"
+
+	studio "github.com/delminator/redstars/studio"
 )
 
 // SHARED org plugin-signing pubkey — identical in every app + the frontend.
@@ -27,9 +30,6 @@ var fallbackSignature []byte
 
 //go:embed ui-fallback/manifest.json
 var fallbackManifest []byte
-
-//go:embed appmeta.json
-var appMeta []byte
 
 var core *coresdk.Client
 
@@ -48,7 +48,7 @@ func main() {
 
 	pluginHost := pluginhost.New(pluginhost.Config{
 		AppID: "studio", GHRepo: "delminator/redstars-studio", Pubkey: pluginPubkey,
-		EmbedBundle: fallbackBundle, EmbedSignature: fallbackSignature, EmbedManifest: fallbackManifest, EmbedMeta: appMeta,
+		EmbedBundle: fallbackBundle, EmbedSignature: fallbackSignature, EmbedManifest: fallbackManifest, Store: appstore.MustLoad(studio.Files), // visibility/, settings/, pages/ (store.go)
 	})
 	if err := pluginHost.Boot(context.Background()); err != nil {
 		log.Printf("[pluginhost] boot failed (continuing with fallback): %v", err)

@@ -1,0 +1,24 @@
+{
+  "access": [
+    {
+      "scope": "wallet",
+      "level": "read",
+      "why": "Afficher le solde du portefeuille."
+    },
+    {
+      "scope": "events",
+      "level": "read",
+      "why": "Afficher les événements et annonces."
+    },
+    {
+      "scope": "events",
+      "level": "write",
+      "why": "Publier des événements et des annonces."
+    }
+  ],
+  "roles": {
+    "admin": "Accès complet, y compris les réglages de l'app.",
+    "collaborator": "Gestion au quotidien (vue équipe), sans les réglages.",
+    "member": "Vue membre : consulter et utiliser ce qui lui est ouvert."
+  }
+}
